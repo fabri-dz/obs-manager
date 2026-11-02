@@ -233,6 +233,64 @@ async function cloneObsConfiguration(sourceConfig, targetConfig) {
   })
 }
 
+async function scoreObsConfiguration(configPath) {
+  try {
+    await fs.access(configPath)
+    const scenes = await fs.readdir(path.join(configPath, 'basic', 'scenes'), { withFileTypes: true }).catch(() => [])
+    const profilesFound = await fs.readdir(path.join(configPath, 'basic', 'profiles'), { withFileTypes: true }).catch(() => [])
+    const sceneFiles = scenes.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.json'))
+    let configuredSourceCount = 0
+    for (const sceneFile of sceneFiles) {
+      try {
+        const collection = JSON.parse(await fs.readFile(path.join(configPath, 'basic', 'scenes', sceneFile.name), 'utf8'))
+        const sources = Array.isArray(collection.sources) ? collection.sources : []
+        configuredSourceCount += sources.filter((source) => {
+          if (source?.id !== 'scene') return true
+          return Array.isArray(source?.settings?.items) && source.settings.items.length > 0
+        }).length
+      } catch {
+        // Una colección dañada no debe impedir evaluar las demás.
+      }
+    }
+    const sceneCount = sceneFiles.length
+    const profileCount = profilesFound.filter((entry) => entry.isDirectory()).length
+    return {
+      configPath,
+      sceneCount,
+      configuredSourceCount,
+      profileCount,
+      score: configuredSourceCount * 10000 + sceneCount * 100 + profileCount * 10 + 1,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function findBestObsConfiguration(sourceRoot, targetConfig) {
+  const candidates = [
+    path.join(sourceRoot, 'config', 'obs-studio'),
+    path.join(app.getPath('appData'), 'obs-studio'),
+  ]
+  for (const savedProfile of profiles) {
+    if (!savedProfile.obsExecutable || path.basename(savedProfile.obsExecutable).toLowerCase() !== 'obs64.exe') continue
+    const savedRoot = path.resolve(path.dirname(savedProfile.obsExecutable), '..', '..')
+    candidates.push(path.join(savedRoot, 'config', 'obs-studio'))
+  }
+  const instancesRoot = path.join(app.getPath('userData'), 'obs-instances')
+  const instances = await fs.readdir(instancesRoot, { withFileTypes: true }).catch(() => [])
+  for (const instance of instances) {
+    if (instance.isDirectory()) {
+      candidates.push(path.join(instancesRoot, instance.name, 'runtime', 'config', 'obs-studio'))
+    }
+  }
+
+  const unique = [...new Set(candidates.map((candidate) => path.resolve(candidate)))]
+    .filter((candidate) => candidate.toLowerCase() !== path.resolve(targetConfig).toLowerCase())
+  const scored = (await Promise.all(unique.map(scoreObsConfiguration))).filter(Boolean)
+  scored.sort((left, right) => right.score - left.score)
+  return scored[0] || null
+}
+
 async function prepareLightweightInstance(profile) {
   const executable = path.resolve(profile.obsExecutable)
   if (path.basename(executable).toLowerCase() !== 'obs64.exe') {
@@ -245,22 +303,20 @@ async function prepareLightweightInstance(profile) {
   const targetRoot = path.join(app.getPath('userData'), 'obs-instances', profile.id, 'runtime')
   const targetConfig = path.join(targetRoot, 'config', 'obs-studio')
   const cloneMarker = path.join(targetConfig, '.obs-manager-full-clone-v1')
-  try {
-    await fs.access(cloneMarker)
-  } catch {
-    const portableConfig = path.join(sourceRoot, 'config', 'obs-studio')
-    const installedConfig = path.join(app.getPath('appData'), 'obs-studio')
-    let sourceConfig = portableConfig
-    try {
-      await fs.access(sourceConfig)
-    } catch {
-      sourceConfig = installedConfig
+  const markerExists = await fs.access(cloneMarker).then(() => true).catch(() => false)
+  const targetState = await scoreObsConfiguration(targetConfig)
+  const bestSource = await findBestObsConfiguration(sourceRoot, targetConfig)
+  const targetIsEmpty = !targetState || targetState.configuredSourceCount === 0
+  const shouldClone = !markerExists || (targetIsEmpty && bestSource?.configuredSourceCount > 0)
+
+  if (shouldClone) {
+    if (!bestSource || bestSource.configuredSourceCount === 0) {
+      throw new Error('No se encontró ninguna configuración de OBS con fuentes configuradas. Seleccioná el obs64.exe del OBS original que funciona y volvé a conectar.')
     }
     try {
-      await fs.access(sourceConfig)
       await fs.mkdir(targetConfig, { recursive: true })
-      await cloneObsConfiguration(sourceConfig, targetConfig)
-      await fs.writeFile(cloneMarker, new Date().toISOString(), 'utf8')
+      await cloneObsConfiguration(bestSource.configPath, targetConfig)
+      await fs.writeFile(cloneMarker, JSON.stringify({ clonedAt: new Date().toISOString(), source: bestSource.configPath }), 'utf8')
     } catch (error) {
       throw new Error(`No se pudo clonar la configuración original de OBS. Cerrá el OBS original e intentá nuevamente: ${error.message}`)
     }

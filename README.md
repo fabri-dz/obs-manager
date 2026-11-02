@@ -35,6 +35,7 @@ Para transmitir simultáneamente sin copiar OBS completo, activá **Usar instanc
 1. Seleccionar el mismo `obs64.exe` instalado en todos los perfiles.
 2. OBS Manager crea una vista portable ligera por streamer usando enlaces de directorio de Windows, sin permisos de administrador y sin duplicar los binarios.
    En el primer inicio también clona la configuración completa del OBS original: escenas, perfiles, fuentes, filtros, audio, transiciones, docks y plugins. La configuración WebSocket se mantiene separada para permitir puertos distintos.
+   Si el OBS original es portable, la app compara su configuración con el OBS normal, las rutas guardadas en los otros perfiles y las instancias ya creadas. Utiliza automáticamente la que tenga más fuentes y colecciones de escenas, y repara instancias que sólo tengan la escena vacía predeterminada.
 3. En OBS, abrir **Herramientas → Ajustes del servidor WebSocket**.
 4. Activar el servidor, asignar una contraseña y usar un puerto exclusivo:
    - Streamer 1: `4455`
