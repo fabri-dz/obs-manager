@@ -4,4 +4,5 @@ release/
 *.log
 .vite/
 .tmp-ui/
+.tmp-light/
 

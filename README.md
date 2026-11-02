@@ -32,7 +32,7 @@ El repositorio debe permitir descargar públicamente los archivos de Releases. N
 Para transmitir simultáneamente sin copiar OBS completo, activá **Usar instancia ligera aislada** en cada perfil:
 
 1. Seleccionar el mismo `obs64.exe` instalado en todos los perfiles.
-2. OBS Manager crea una vista portable ligera por streamer usando enlaces de archivos NTFS.
+2. OBS Manager crea una vista portable ligera por streamer usando enlaces de directorio de Windows, sin permisos de administrador y sin duplicar los binarios.
    En el primer inicio también copia las escenas y perfiles básicos existentes como punto de partida, sin compartirlos posteriormente.
 3. En OBS, abrir **Herramientas → Ajustes del servidor WebSocket**.
 4. Activar el servidor, asignar una contraseña y usar un puerto exclusivo:

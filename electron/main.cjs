@@ -197,21 +197,23 @@ async function linkOrCopyFile(source, target) {
   }
 }
 
-async function mirrorObsFiles(sourceDir, targetDir, relative = '') {
-  await fs.mkdir(targetDir, { recursive: true })
-  const entries = await fs.readdir(sourceDir, { withFileTypes: true })
-  for (const entry of entries) {
-    const relativePath = relative ? path.join(relative, entry.name) : entry.name
-    const topLevel = relativePath.split(path.sep)[0].toLowerCase()
-    if (topLevel === 'config' || topLevel === 'portable_mode' || topLevel === 'portable_mode.txt') continue
+async function ensureDirectoryJunction(source, target) {
+  const existing = await fs.lstat(target).catch(() => null)
+  if (existing?.isSymbolicLink()) return
+  if (existing) await fs.rm(target, { recursive: true, force: true })
+  await fs.symlink(source, target, 'junction')
+}
 
-    const source = path.join(sourceDir, entry.name)
-    const target = path.join(targetDir, entry.name)
-    if (entry.isDirectory()) {
-      await mirrorObsFiles(source, target, relativePath)
-    } else if (entry.isFile()) {
-      await linkOrCopyFile(source, target)
-    }
+async function linkObsRuntime(sourceRoot, targetRoot) {
+  await fs.mkdir(targetRoot, { recursive: true })
+  const entries = await fs.readdir(sourceRoot, { withFileTypes: true })
+  for (const entry of entries) {
+    const name = entry.name.toLowerCase()
+    if (name === 'config' || name === 'portable_mode' || name === 'portable_mode.txt') continue
+    const source = path.join(sourceRoot, entry.name)
+    const target = path.join(targetRoot, entry.name)
+    if (entry.isDirectory()) await ensureDirectoryJunction(source, target)
+    else if (entry.isFile()) await linkOrCopyFile(source, target)
   }
 }
 
@@ -245,7 +247,7 @@ async function prepareLightweightInstance(profile) {
       // OBS creará una configuración básica limpia en el primer inicio.
     }
   }
-  await mirrorObsFiles(sourceRoot, targetRoot)
+  await linkObsRuntime(sourceRoot, targetRoot)
   await fs.writeFile(path.join(targetRoot, 'portable_mode.txt'), '', { flag: 'a' })
   return path.join(targetRoot, 'bin', '64bit', 'obs64.exe')
 }
