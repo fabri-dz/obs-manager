@@ -33,7 +33,25 @@ jobs:
             throw "package.json ($packageVersion) no coincide con el tag ($tagVersion)"
           }
 
-      - name: Compilar y publicar Release
+      - name: Compilar instalador
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Preparar archivos de actualización
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          Copy-Item "release\OBS Manager Setup $version.exe" "release\OBS-Manager-Setup-$version.exe"
+          Copy-Item "release\OBS Manager Setup $version.exe.blockmap" "release\OBS-Manager-Setup-$version.exe.blockmap"
+
+      - name: Publicar Release
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win nsis --publish always
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          gh release create "${{ github.ref_name }}" `
+            --title "OBS Manager $version" `
+            --notes "Actualización automática de OBS Manager $version." `
+            "release\latest.yml" `
+            "release\OBS-Manager-Setup-$version.exe" `
+            "release\OBS-Manager-Setup-$version.exe.blockmap"
