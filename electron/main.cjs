@@ -493,6 +493,10 @@ function registerIpc() {
     if (!input?.name?.trim()) throw new Error('El nombre del streamer es obligatorio.')
     const port = Number(input.obsPort)
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('El puerto de OBS no es válido.')
+    const duplicatePort = profiles.find((profile) => profile.id !== input.id && profile.obsPort === port)
+    if (duplicatePort) {
+      throw new Error(`El puerto ${port} ya está usado por ${duplicatePort.name}. Cada instancia local de OBS necesita un puerto diferente.`)
+    }
 
     const existing = profiles.find((profile) => profile.id === input.id)
     const now = new Date().toISOString()
