@@ -252,12 +252,41 @@ async function prepareLightweightInstance(profile) {
   return path.join(targetRoot, 'bin', '64bit', 'obs64.exe')
 }
 
+async function resolveObsExecutable(profile) {
+  if (profile.obsExecutable) {
+    try {
+      await fs.access(profile.obsExecutable)
+      return profile.obsExecutable
+    } catch {
+      // Intentar detectar nuevamente una instalación estándar.
+    }
+  }
+
+  const candidates = [
+    process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'obs-studio', 'bin', '64bit', 'obs64.exe'),
+    process.env['ProgramFiles(x86)'] && path.join(process.env['ProgramFiles(x86)'], 'obs-studio', 'bin', '64bit', 'obs64.exe'),
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate)
+      profile.obsExecutable = candidate
+      profile.updatedAt = new Date().toISOString()
+      await writeJson('profiles.json', profiles)
+      broadcast()
+      return candidate
+    } catch {
+      // Probar la siguiente ubicación conocida.
+    }
+  }
+  throw new Error('No se encontró obs64.exe. Abrí el perfil y seleccionalo con el botón Buscar.')
+}
+
 async function launchObs(profile) {
-  if (!profile.obsExecutable) return
   const existing = launchedProcesses.get(profile.id)
   if (existing && !existing.killed) return
 
-  let executable = profile.obsExecutable
+  let executable = await resolveObsExecutable(profile)
   let args = parseArgs(profile.obsArgs)
   if (profile.lightweightInstance) {
     executable = await prepareLightweightInstance(profile)
@@ -345,7 +374,7 @@ async function connectProfile(id) {
     lastError = error
   }
 
-  if (!client && profile.autoLaunch && profile.obsExecutable) {
+  if (!client && profile.autoLaunch) {
     await launchObs(profile)
     for (let attempt = 0; attempt < 20 && !client; attempt += 1) {
       await wait(750)
