@@ -34,7 +34,9 @@ jobs:
           }
 
       - name: Compilar instalador
-        run: npx electron-builder --win nsis --publish never
+        run: |
+          npm run build
+          npx electron-builder --win nsis --publish never
 
       - name: Preparar archivos de actualización
         shell: pwsh
