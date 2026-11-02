@@ -1,0 +1,63 @@
+{
+  "name": "obs-manager",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Panel local para administrar multiples transmisiones de OBS",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fabri-dz/obs-manager.git"
+  },
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 node scripts/launch-electron.cjs\"",
+    "build": "tsc -b && vite build",
+    "dist": "npm run build && electron-builder --win nsis",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "obs-websocket-js": "^5.0.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.1.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.2",
+    "wait-on": "^9.0.1"
+  },
+  "build": {
+    "appId": "com.obsmanager.app",
+    "productName": "OBS Manager",
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "fabri-dz",
+        "repo": "obs-manager"
+      }
+    ],
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
