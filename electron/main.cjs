@@ -178,13 +178,94 @@ function parseArgs(value) {
   return (value.match(/(?:[^\s"]+|"[^"]*")+/g) || []).map((part) => part.replace(/^"|"$/g, ''))
 }
 
-function launchObs(profile) {
+async function linkOrCopyFile(source, target) {
+  try {
+    const [sourceStat, targetStat] = await Promise.all([
+      fs.stat(source),
+      fs.stat(target).catch(() => null),
+    ])
+    if (targetStat && sourceStat.dev === targetStat.dev && sourceStat.ino === targetStat.ino) return
+    if (targetStat) await fs.unlink(target)
+    try {
+      await fs.link(source, target)
+    } catch (error) {
+      if (!['EXDEV', 'EPERM', 'EACCES'].includes(error.code)) throw error
+      await fs.copyFile(source, target)
+    }
+  } catch (error) {
+    throw new Error(`No se pudo preparar ${path.basename(source)}: ${error.message}`)
+  }
+}
+
+async function mirrorObsFiles(sourceDir, targetDir, relative = '') {
+  await fs.mkdir(targetDir, { recursive: true })
+  const entries = await fs.readdir(sourceDir, { withFileTypes: true })
+  for (const entry of entries) {
+    const relativePath = relative ? path.join(relative, entry.name) : entry.name
+    const topLevel = relativePath.split(path.sep)[0].toLowerCase()
+    if (topLevel === 'config' || topLevel === 'portable_mode' || topLevel === 'portable_mode.txt') continue
+
+    const source = path.join(sourceDir, entry.name)
+    const target = path.join(targetDir, entry.name)
+    if (entry.isDirectory()) {
+      await mirrorObsFiles(source, target, relativePath)
+    } else if (entry.isFile()) {
+      await linkOrCopyFile(source, target)
+    }
+  }
+}
+
+async function prepareLightweightInstance(profile) {
+  const executable = path.resolve(profile.obsExecutable)
+  if (path.basename(executable).toLowerCase() !== 'obs64.exe') {
+    throw new Error('Seleccioná el archivo obs64.exe de la instalación principal de OBS.')
+  }
+  const sourceRoot = path.resolve(path.dirname(executable), '..', '..')
+  const sourceExecutable = path.join(sourceRoot, 'bin', '64bit', 'obs64.exe')
+  await fs.access(sourceExecutable)
+
+  const targetRoot = path.join(app.getPath('userData'), 'obs-instances', profile.id, 'runtime')
+  const targetBasicConfig = path.join(targetRoot, 'config', 'obs-studio', 'basic')
+  try {
+    await fs.access(targetBasicConfig)
+  } catch {
+    const portableBasicConfig = path.join(sourceRoot, 'config', 'obs-studio', 'basic')
+    const installedBasicConfig = path.join(app.getPath('appData'), 'obs-studio', 'basic')
+    let sourceBasicConfig = portableBasicConfig
+    try {
+      await fs.access(sourceBasicConfig)
+    } catch {
+      sourceBasicConfig = installedBasicConfig
+    }
+    try {
+      await fs.access(sourceBasicConfig)
+      await fs.mkdir(path.dirname(targetBasicConfig), { recursive: true })
+      await fs.cp(sourceBasicConfig, targetBasicConfig, { recursive: true })
+    } catch {
+      // OBS creará una configuración básica limpia en el primer inicio.
+    }
+  }
+  await mirrorObsFiles(sourceRoot, targetRoot)
+  await fs.writeFile(path.join(targetRoot, 'portable_mode.txt'), '', { flag: 'a' })
+  return path.join(targetRoot, 'bin', '64bit', 'obs64.exe')
+}
+
+async function launchObs(profile) {
   if (!profile.obsExecutable) return
   const existing = launchedProcesses.get(profile.id)
   if (existing && !existing.killed) return
 
-  const child = spawn(profile.obsExecutable, parseArgs(profile.obsArgs), {
-    cwd: path.dirname(profile.obsExecutable),
+  let executable = profile.obsExecutable
+  let args = parseArgs(profile.obsArgs)
+  if (profile.lightweightInstance) {
+    executable = await prepareLightweightInstance(profile)
+    args = args.filter((arg) => !['--portable', '-p'].includes(arg.toLowerCase()))
+    if (!args.some((arg) => ['--multi', '-m'].includes(arg.toLowerCase()))) args.push('--multi')
+    args.push('--portable')
+  }
+
+  const child = spawn(executable, args, {
+    cwd: path.dirname(executable),
     detached: false,
     windowsHide: false,
     stdio: 'ignore',
@@ -263,7 +344,7 @@ async function connectProfile(id) {
   }
 
   if (!client && profile.autoLaunch && profile.obsExecutable) {
-    launchObs(profile)
+    await launchObs(profile)
     for (let attempt = 0; attempt < 20 && !client; attempt += 1) {
       await wait(750)
       try {
@@ -426,6 +507,7 @@ function registerIpc() {
       defaultDurationSeconds: Math.max(60, Number(input.defaultDurationSeconds) || 3600),
       obsExecutable: input.obsExecutable?.trim() || '',
       obsArgs: input.obsArgs?.trim() || '',
+      lightweightInstance: Boolean(input.lightweightInstance),
       autoLaunch: Boolean(input.autoLaunch),
       closeAfterStop: Boolean(input.closeAfterStop),
       streamKeyEncrypted: input.streamKey ? encryptSecret(input.streamKey) : existing?.streamKeyEncrypted || '',

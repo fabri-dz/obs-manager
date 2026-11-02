@@ -22,7 +22,8 @@ const blankProfile = (port = 4455): ProfileInput => ({
   initialScene: '',
   defaultDurationSeconds: 3600,
   obsExecutable: '',
-  obsArgs: '--portable --multi',
+  obsArgs: '--multi',
+  lightweightInstance: true,
   autoLaunch: true,
   closeAfterStop: false,
   streamKey: '',
@@ -380,8 +381,9 @@ function ProfileEditor({ value, existing, saving, onChange, onClose, onSave, onD
               <label><span>Host</span><input value={value.obsHost} onChange={(event) => set('obsHost', event.target.value)} /></label>
               <label><span>Puerto WebSocket</span><input type="number" value={value.obsPort} onChange={(event) => set('obsPort', Number(event.target.value))} /></label>
               <label><span>Contraseña {existing && value.hasObsPassword ? '· guardada' : ''}</span><input type="password" value={value.obsPassword || ''} onChange={(event) => set('obsPassword', event.target.value)} placeholder={existing && value.hasObsPassword ? 'Sin cambios' : 'Opcional'} /></label>
-              <label className="full"><span>Ejecutable de OBS portable</span><div className="input-button"><input value={value.obsExecutable} onChange={(event) => set('obsExecutable', event.target.value)} placeholder="C:\\OBS-Streamer1\\bin\\64bit\\obs64.exe" /><button onClick={chooseExecutable}>Buscar</button></div></label>
-              <label className="full"><span>Argumentos de inicio</span><input value={value.obsArgs} onChange={(event) => set('obsArgs', event.target.value)} placeholder="--portable --multi" /></label>
+              <label className="full"><span>Ejecutable del OBS instalado</span><div className="input-button"><input value={value.obsExecutable} onChange={(event) => set('obsExecutable', event.target.value)} placeholder="C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe" /><button onClick={chooseExecutable}>Buscar</button></div></label>
+              <label className="full"><span>Argumentos de inicio</span><input value={value.obsArgs} onChange={(event) => set('obsArgs', event.target.value)} placeholder="--multi" /></label>
+              <label className="check full"><input type="checkbox" checked={value.lightweightInstance} onChange={(event) => set('lightweightInstance', event.target.checked)} /><span><strong>Usar instancia ligera aislada</strong><small>Comparte los binarios del OBS instalado, pero mantiene escenas, puertos y ajustes separados para este streamer.</small></span></label>
             </div>
           </div>
 

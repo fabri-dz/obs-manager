@@ -15,6 +15,7 @@ export interface StreamerProfile {
   defaultDurationSeconds: number
   obsExecutable: string
   obsArgs: string
+  lightweightInstance: boolean
   autoLaunch: boolean
   closeAfterStop: boolean
   createdAt: string

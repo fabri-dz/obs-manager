@@ -12,6 +12,7 @@ Aplicación local de Windows para controlar varias transmisiones de OBS en paral
 - Persistencia del horario de finalización: si la app se reinicia, recupera el temporizador y detiene una transmisión vencida al volver a abrirse.
 - Si se intenta cerrar la ventana mientras hay un stream programado, la app se minimiza y mantiene activo el temporizador.
 - Lanzamiento opcional de una instalación portable de OBS por streamer.
+- Instancias ligeras aisladas: todos los perfiles pueden compartir un único OBS instalado; los binarios se enlazan sin duplicar su espacio y cada perfil conserva su propia configuración portable.
 - Soporte para servicios conocidos de OBS y servidores RTMP personalizados.
 - Actualizaciones automáticas mediante versiones publicadas en GitHub Releases.
 
@@ -28,17 +29,18 @@ El repositorio debe permitir descargar públicamente los archivos de Releases. N
 
 ## Configurar cada OBS
 
-Para transmitir simultáneamente, cada streamer debe usar una instalación portable separada de OBS:
+Para transmitir simultáneamente sin copiar OBS completo, activá **Usar instancia ligera aislada** en cada perfil:
 
-1. Copiar o descomprimir OBS en una carpeta propia, por ejemplo `C:\OBS\JuanGaming`.
-2. Iniciar `bin\64bit\obs64.exe` con `--portable --multi`.
+1. Seleccionar el mismo `obs64.exe` instalado en todos los perfiles.
+2. OBS Manager crea una vista portable ligera por streamer usando enlaces de archivos NTFS.
+   En el primer inicio también copia las escenas y perfiles básicos existentes como punto de partida, sin compartirlos posteriormente.
 3. En OBS, abrir **Herramientas → Ajustes del servidor WebSocket**.
 4. Activar el servidor, asignar una contraseña y usar un puerto exclusivo:
    - Streamer 1: `4455`
    - Streamer 2: `4456`
    - Streamer 3: `4457`
    - Streamer 4: `4458`
-5. Importar o crear las escenas del streamer en esa instancia.
+5. Importar o crear las escenas del streamer la primera vez que se abre su instancia.
 6. Crear el perfil correspondiente en OBS Manager con el mismo puerto y contraseña.
 
 Una cámara física puede no admitir acceso desde dos OBS a la vez. Si hay que compartirla, será necesario distribuir la captura mediante NDI, cámara virtual u otro método.
