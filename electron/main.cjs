@@ -217,6 +217,22 @@ async function linkObsRuntime(sourceRoot, targetRoot) {
   }
 }
 
+async function cloneObsConfiguration(sourceConfig, targetConfig) {
+  const ignoredTopLevel = new Set(['.sentinel', 'crashes', 'logs', 'profiler_data', 'updates'])
+  await fs.cp(sourceConfig, targetConfig, {
+    recursive: true,
+    force: true,
+    filter: (source) => {
+      const relative = path.relative(sourceConfig, source).toLowerCase()
+      if (!relative) return true
+      const parts = relative.split(path.sep)
+      if (ignoredTopLevel.has(parts[0])) return false
+      if (parts[0] === 'plugin_config' && parts[1] === 'obs-websocket') return false
+      return true
+    },
+  })
+}
+
 async function prepareLightweightInstance(profile) {
   const executable = path.resolve(profile.obsExecutable)
   if (path.basename(executable).toLowerCase() !== 'obs64.exe') {
@@ -227,24 +243,26 @@ async function prepareLightweightInstance(profile) {
   await fs.access(sourceExecutable)
 
   const targetRoot = path.join(app.getPath('userData'), 'obs-instances', profile.id, 'runtime')
-  const targetBasicConfig = path.join(targetRoot, 'config', 'obs-studio', 'basic')
+  const targetConfig = path.join(targetRoot, 'config', 'obs-studio')
+  const cloneMarker = path.join(targetConfig, '.obs-manager-full-clone-v1')
   try {
-    await fs.access(targetBasicConfig)
+    await fs.access(cloneMarker)
   } catch {
-    const portableBasicConfig = path.join(sourceRoot, 'config', 'obs-studio', 'basic')
-    const installedBasicConfig = path.join(app.getPath('appData'), 'obs-studio', 'basic')
-    let sourceBasicConfig = portableBasicConfig
+    const portableConfig = path.join(sourceRoot, 'config', 'obs-studio')
+    const installedConfig = path.join(app.getPath('appData'), 'obs-studio')
+    let sourceConfig = portableConfig
     try {
-      await fs.access(sourceBasicConfig)
+      await fs.access(sourceConfig)
     } catch {
-      sourceBasicConfig = installedBasicConfig
+      sourceConfig = installedConfig
     }
     try {
-      await fs.access(sourceBasicConfig)
-      await fs.mkdir(path.dirname(targetBasicConfig), { recursive: true })
-      await fs.cp(sourceBasicConfig, targetBasicConfig, { recursive: true })
-    } catch {
-      // OBS creará una configuración básica limpia en el primer inicio.
+      await fs.access(sourceConfig)
+      await fs.mkdir(targetConfig, { recursive: true })
+      await cloneObsConfiguration(sourceConfig, targetConfig)
+      await fs.writeFile(cloneMarker, new Date().toISOString(), 'utf8')
+    } catch (error) {
+      throw new Error(`No se pudo clonar la configuración original de OBS. Cerrá el OBS original e intentá nuevamente: ${error.message}`)
     }
   }
   await linkObsRuntime(sourceRoot, targetRoot)
