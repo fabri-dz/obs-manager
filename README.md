@@ -14,6 +14,7 @@ Aplicación local de Windows para controlar varias transmisiones de OBS en paral
 - Lanzamiento opcional de una instalación portable de OBS por streamer.
 - Instancias ligeras aisladas: todos los perfiles pueden compartir un único OBS instalado; los binarios se enlazan sin duplicar su espacio y cada perfil conserva su propia configuración portable.
 - Soporte para servicios conocidos de OBS y servidores RTMP personalizados.
+- Al iniciar, conserva el servicio y servidor RTMP válidos de cada OBS y actualiza únicamente la clave de transmisión, evitando reemplazar la URL por una configuración incompleta.
 - Actualizaciones automáticas mediante versiones publicadas en GitHub Releases.
 
 ## Publicar una actualización

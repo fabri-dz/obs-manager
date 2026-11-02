@@ -437,18 +437,25 @@ async function applyStreamSettings(profile, client) {
   const key = decryptSecret(profile.streamKeyEncrypted)
   if (!key) return
 
-  const streamServiceSettings = { key }
-  if (profile.serviceType === 'rtmp_custom') {
-    if (!profile.server) throw new Error('Falta el servidor RTMP personalizado.')
+  const current = await client.call('GetStreamServiceSettings')
+  let streamServiceType = current.streamServiceType
+  const streamServiceSettings = { ...(current.streamServiceSettings || {}), key }
+
+  if (profile.serviceType === 'rtmp_custom' && profile.server) {
+    streamServiceType = 'rtmp_custom'
     streamServiceSettings.server = profile.server
-    streamServiceSettings.use_auth = false
-  } else {
+    if (streamServiceSettings.use_auth == null) streamServiceSettings.use_auth = false
+  } else if (!streamServiceType) {
+    streamServiceType = 'rtmp_common'
     streamServiceSettings.service = profile.serviceName || profile.platform || 'Twitch'
-    if (profile.server) streamServiceSettings.server = profile.server
+  }
+
+  if (!streamServiceSettings.server) {
+    throw new Error('OBS no tiene un servidor de emisión configurado. Abrí Ajustes → Emisión en esa instancia y elegí un servidor antes de iniciar.')
   }
 
   await client.call('SetStreamServiceSettings', {
-    streamServiceType: profile.serviceType,
+    streamServiceType,
     streamServiceSettings,
   })
 }
